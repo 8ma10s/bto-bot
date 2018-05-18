@@ -1,12 +1,13 @@
-import discord
 import asyncio
-import sys
-import random
-import os
-import aiohttp
-import time
-import numpy as np
 import configparser
+import os
+import random
+import sys
+import time
+
+import aiohttp
+import discord
+import numpy as np
 
 #load config
 CONFIGDIR = 'config'
