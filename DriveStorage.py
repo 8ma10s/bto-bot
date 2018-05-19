@@ -75,16 +75,27 @@ class DriveStorage:
                     curDir = curDir['subdir'][dir]
         
         
-        gFile = self.drive.CreateFile(
-            {'title':filename,
-            'parents':[{'kind': 'drive#fileLink', 'id': curDir['id']}]
-        })
+        self.__refreshDir(curDir['id'], curDir)
+        # update file
+        if filename in curDir['subdir']:
+            gFile = self.drive.CreateFile(
+                {'title':filename, 
+                'id': curDir['subdir'][filename]['id'],
+                'parents':[{'kind': 'drive#fileLink', 'id': curDir['id']}]
+                })
+            
+        else:
+            gFile = self.drive.CreateFile(
+                {'title':filename,
+                'parents':[{'kind': 'drive#fileLink', 'id': curDir['id']}]
+                })
+
 
         gFile.content = data
         gFile.Upload()
         self.__reduceCache()
         if gFile['id'] in self.dataCache:
-            self.cacheSize -= self.dataCache[gFile['id']].getbuffer.nbytes
+            self.cacheSize -= self.dataCache[gFile['id']].getbuffer().nbytes
             self.dataCache[gFile['id']].close()
         self.dataCache[gFile['id']] = data
         self.cacheSize += data.getbuffer().nbytes
@@ -118,11 +129,9 @@ class DriveStorage:
                     self.dataCache.move_to_end(matchObj['id'])
                     print('cached, no list load')
                     return (key, self.dataCache[matchObj['id']])
-        queryStr = ''
-        for filename in filenames:
-            queryStr += "title contains '" + filename + "' and "
-        print("'" + curDir['id'] + "' in parents and " + queryStr + "trashed=false")
-        gFiles = self.drive.ListFile({'q': "'" + curDir['id'] + "' in parents and " + queryStr + "trashed=false"}).GetList()
+
+        gFiles = self.drive.ListFile({'q': "'" + curDir['id'] + "' in parents and trashed=false"}).GetList()
+        gFiles = list(filter(lambda x: all(y in x['title'] for y in filenames), gFiles))
 
         if not gFiles:
             raise FileNotFoundError('Could not find a file that matches all queries')
@@ -187,3 +196,4 @@ class DriveStorage:
                 bio.close()
         else:
             return
+    

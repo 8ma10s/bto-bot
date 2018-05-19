@@ -1,3 +1,4 @@
 keys.ini
 *.json
 stamps/
+__pycache__/
