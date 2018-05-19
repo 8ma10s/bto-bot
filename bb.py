@@ -4,10 +4,12 @@ import os
 import random
 import sys
 import time
+import io
 
 import aiohttp
 import discord
 import numpy as np
+import DriveStorage
 
 #load config
 CONFIGDIR = 'config'
@@ -19,9 +21,6 @@ config.read(os.path.join(CONFIGDIR, CONFIGFILE))
 configKeys.read(os.path.join(CONFIGDIR, KEYSFILE))
 
 
-# initial setup
-client = discord.Client()
-
 # keys/IDs setup
 DISCORD_SECRET = configKeys.get('keys', 'discord_secret')
 MY_ID = configKeys.get('ids', 'my_id')
@@ -30,6 +29,7 @@ ROM_ID = configKeys.get('ids', 'rom_ids').splitlines()
 # constant setup (from ini files)
 MAX_GACHA = config.getint('constants', 'MAX_GACHA')
 MAX_UR = config.getint('constants', 'MAX_UR')
+ROOTID = config.get('directories', 'ROOTID')
 STAMPDIR = config.get('directories', 'STAMPDIR')
 GACHADIR = config.get('directories', 'GACHADIR')
 RESOURCESDIR = config.get('directories', 'RESOURCESDIR')
@@ -68,6 +68,10 @@ def timeDiff(start):
 
 def getProb(card):
     return GACHA_PROB[card.split('_')[1]]
+
+# initial setup
+client = discord.Client()
+ds = DriveStorage.DriveStorage(ROOTID)
 
 @client.event
 async def on_ready():
@@ -127,11 +131,6 @@ async def on_message(message):
             if any(x in command for x in ['..', '/', '\\']):
                 await client.send_message(message.channel, '悪用禁止')
                 return
-            try:
-                os.makedirs(os.path.join(STAMPDIR,command), exist_ok = True)
-            except FileNotFoundError:
-                await client.send_message(message.channel, '恐らくディレクトリ名にできない文字が含まれてる')
-                return
             
             if not args or '.' not in args[0]:
                 await client.send_message(message.channel, 'ファイル名を拡張子込みでうちこめ')
@@ -147,11 +146,11 @@ async def on_message(message):
                     async with aiohttp.ClientSession() as session:
                         async with session.get(imgMsg.attachments[0]['url']) as resp:
                             attachment = await resp.read()
-                            with open(os.path.join(STAMPDIR, command, args[0]), "wb") as f:
-                                f.write(attachment)
-                                pic = open(os.path.join(STAMPDIR, command, args[0]), 'rb')
-                                await client.send_file(message.channel, pic, content='フォルダ' + command + 'に' + args[0] + 'を追加')
-                                pic.close()
+                            pic = io.BytesIO(attachment)
+                            ds.upload(pic, [STAMPDIR, command], args[0])
+                            pic.seek(0)
+                            await client.send_file(message.channel, pic, filename=args[0], content='フォルダ' + command + 'に' + args[0] + 'を追加')
+                            pic.seek(0)
                 else:
                     await client.send_message(message.channel, '添付ファイルが無いんだけど・・・')
             return 
@@ -166,18 +165,18 @@ async def on_message(message):
                 return
             # list all folders
             if command == 'list':
-                await client.send_message(message.channel, str(os.listdir(STAMPDIR)))
-                return
-            try:
-                ls = sorted(os.listdir(os.path.join(STAMPDIR,command)))
-            except FileNotFoundError:
-                await client.send_message(message.channel, 'そんなフォルダは無いZOY')
-                timeDiff(startTime)
+                ls = sorted(ds.listFiles(tuple([STAMPDIR])))
+                await client.send_message(message.channel, str(ls))
                 return
 
             if args:
                 # list files in the specified folder
                 if args[0] == 'list':
+                    try:
+                        ls = sorted(ds.listFiles(tuple([STAMPDIR, command])))
+                    except DriveStorage.DirectoryNotFoundError:
+                        await client.send_message(message.channel, 'そんなフォルダは無いZOY')
+                        return
                     # list all files
                     if len(args) == 1:
                         await client.send_message(message.channel, str(ls))
@@ -200,26 +199,30 @@ async def on_message(message):
                 
                 #send files that match
                 else:
-                    for data in ls:
-                        if all(x in data for x in args):
-                            pic = open(os.path.join(STAMPDIR,command, data), 'rb')
-                        
-                            await client.send_file(message.channel, pic, content=data.split('.')[0])
-                            pic.close()
-                            timeDiff(startTime)
-                            return
-                    await client.send_message(message.channel, 'その' + command + 'は存在しません')
-                    timeDiff(startTime)
-                    return
+                    try:
+                        pic = ds.download([STAMPDIR, command], args)
+                    except DriveStorage.DirectoryNotFoundError:
+                        await client.send_message(message.channel, 'そんなフォルダは無いZOY')
+                        return
+                    except DriveStorage.FileNotFoundError:
+                        await client.send_message(message.channel, 'その' + command + 'は存在しません')
+                        return
+                    await client.send_file(message.channel, pic[1], filename=pic[0], content=pic[0].split('.')[0])
+                    pic[1].seek(0)
+                    
             
             # choose a random file from the specified folder and send
             else:
-                picName = random.choice(ls)
-                pic = open(os.path.join(STAMPDIR,command, picName), 'rb')
-                await client.send_file(message.channel, pic, content=picName[0:-4])
-                pic.close()
-                timeDiff(startTime)
-                return
+                try:
+                    pic = ds.download([STAMPDIR, command], [])
+                except DriveStorage.DirectoryNotFoundError:
+                    await client.send_message(message.channel, 'そんなフォルダは無いZOY')
+                    return
+                except DriveStorage.FileNotFoundError:
+                    await client.send_message(message.channel, 'その' + command + 'は存在しません')
+                    return
+                await client.send_file(message.channel, pic[1], filename=pic[0], content=pic[0].split('.')[0])
+                pic[1].seek(0)
             
 
             return

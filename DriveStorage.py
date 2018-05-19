@@ -1,10 +1,10 @@
 import configparser
 import random
+from collections import OrderedDict
 from functools import lru_cache
 
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
-from collections import OrderedDict
 
 
 class DirectoryNotFoundError(Exception):
@@ -80,6 +80,7 @@ class DriveStorage:
             self.dataCache[gFile['id']].close()
         self.dataCache[gFile['id']] = data
         self.cacheSize += data.getbuffer().nbytes
+        self.listFiles.cache_clear()
         curDir['subdir'][filename] = {'id': gFile['id'], 'isDir':False, 'subdir':{}}
         return data
 
@@ -134,7 +135,30 @@ class DriveStorage:
             curDir['subdir'][gFile['title']] = {'id': gFile['id'], 'isDir':False, 'subdir':{}}
             print('not cached')
             return (gFile['title'], gFile.content)
-            
+    
+    @lru_cache()
+    def listFiles(self, location):
+        targetPath = list(location)
+        curDir = self.dirTree['root']
+        for dir in targetPath:
+            if dir in curDir['subdir']:
+                if not curDir['subdir'][dir]['isDir']:
+                    raise NotADirectoryError('name: "' + dir + '" is not a directory')
+                curDir = curDir['subdir'][dir]
+            else:
+
+                self.__refreshDir(curDir['id'], curDir)
+                if dir in curDir['subdir']:
+                    if not curDir['subdir'][dir]['isDir']:
+                        raise NotADirectoryError('name: "' + dir + '" is not a directory')
+                    curDir = curDir['subdir'][dir]
+                else:
+                    raise DirectoryNotFoundError('The specified directory: "' +  dir + '" was not found')
+        
+        print("'" + curDir['id'] + "' in parents and trashed=false")
+        gFiles = self.drive.ListFile({'q': "'" + curDir['id'] + "' in parents and trashed=false"}).GetList()
+        return [gFile['title'] for gFile in gFiles]
+
 
 
 
