@@ -18,9 +18,14 @@ class IsNotDirectoryError(Exception):
 
 class DriveStorage:
 
-    def __init__(self,root):
+    def __init__(self,root, onHeroku):
         gauth = GoogleAuth()
-        gauth.LoadCredentialsFile('mycreds.json') # replace with loadEnv if heroku
+        if onHeroku:
+            from oauth2client.client import Credentials
+            import os
+            gauth.credentials = Credentials.new_from_json(os.environ.get('MYCREDS'))
+        else:
+            gauth.LoadCredentialsFile('mycreds.json') # replace with loadEnv if heroku
         if gauth.credentials is None:
             # Authenticate if they're not there
             gauth.LocalWebserverAuth()
@@ -31,7 +36,10 @@ class DriveStorage:
             # Initialize the saved creds
             gauth.Authorize()
         # Save the current credentials to a file
-        gauth.SaveCredentialsFile('mycreds.json') # replace with saveToEnv if heroku
+        if onHeroku:
+            os.environ['MYCREDS'] = Credentials.to_json(gauth.credentials)
+        else:
+            gauth.SaveCredentialsFile('mycreds.json') # replace with saveToEnv if heroku
 
         # variables
         self.drive = GoogleDrive(gauth)

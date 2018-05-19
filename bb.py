@@ -11,25 +11,37 @@ import discord
 import numpy as np
 import DriveStorage
 
+# check if heroku
+onHeroku  = False
+if 'DYNO' in os.environ:
+    onHeroku = True
 #load config
 CONFIGDIR = 'config'
 CONFIGFILE = 'config.ini'
 KEYSFILE = 'keys.ini'
 config = configparser.ConfigParser()
-configKeys = configparser.ConfigParser()
 config.read(os.path.join(CONFIGDIR, CONFIGFILE))
-configKeys.read(os.path.join(CONFIGDIR, KEYSFILE))
+if not onHeroku:
+    configKeys = configparser.ConfigParser()
+    configKeys.read(os.path.join(CONFIGDIR, KEYSFILE))
 
 
 # keys/IDs setup
-DISCORD_SECRET = configKeys.get('keys', 'discord_secret')
-MY_ID = configKeys.get('ids', 'my_id')
-ROM_ID = configKeys.get('ids', 'rom_ids').splitlines()
+if not onHeroku:
+    DISCORD_SECRET = configKeys.get('keys', 'discord_secret')
+    MY_ID = configKeys.get('ids', 'my_id')
+    ROM_ID = configKeys.get('ids', 'rom_ids').splitlines()
+    ROOTID = configKeys.get('dirids', 'ROOTID')
+else:
+    DISCORD_SECRET = os.environ.get('DISCORD_SECRET')
+    MY_ID = os.environ.get('MY_ID')
+    ROM_ID = os.environ.get('ROM_ID').split()
+    ROOTID = os.environ.get('ROOTID')
 
 # constant setup (from ini files)
 MAX_GACHA = config.getint('constants', 'MAX_GACHA')
 MAX_UR = config.getint('constants', 'MAX_UR')
-ROOTID = config.get('directories', 'ROOTID')
+
 STAMPDIR = config.get('directories', 'STAMPDIR')
 GACHADIR = config.get('directories', 'GACHADIR')
 RESOURCESDIR = config.get('directories', 'RESOURCESDIR')
@@ -71,7 +83,7 @@ def getProb(card):
 
 # initial setup
 client = discord.Client()
-ds = DriveStorage.DriveStorage(ROOTID)
+ds = DriveStorage.DriveStorage(ROOTID, onHeroku)
 
 @client.event
 async def on_ready():
