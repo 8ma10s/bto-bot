@@ -23,7 +23,15 @@ class DriveStorage:
         if onHeroku:
             from oauth2client.client import Credentials
             import os
+            import oauth2client.clientsecrets as clientsecrets
+            # load credentials from env
             gauth.credentials = Credentials.new_from_json(os.environ.get('MYCREDS'))
+            # set client_config from env, and change backend to settings to tell it to load from settings in the future
+            _, client_info = clientsecrets.loads(os.environ.get('CLIENT_SECRETS'))
+            client_info['revoke_uri'] = client_info.get('revoke_uri')
+            client_info['redirect_uri'] = client_info['redirect_uris'][0]
+            gauth.settings['client_config_backend'] = 'settings'
+            gauth.settings['client_config'] = client_info
         else:
             gauth.LoadCredentialsFile('mycreds.json') # replace with loadEnv if heroku
         if gauth.credentials is None:
