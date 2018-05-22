@@ -178,10 +178,9 @@ async def on_message(message):
             # list all folders
             if command == 'list':
                 ls = sorted(ds.listFiles(tuple([STAMPDIR])))
-                await client.send_message(message.channel, str(ls))
-                return
+                await client.send_message(message.channel, 'list of folders: ' + str(ls))
 
-            if args:
+            elif args:
                 # list files in the specified folder
                 if args[0] == 'list':
                     try:
@@ -191,9 +190,7 @@ async def on_message(message):
                         return
                     # list all files
                     if len(args) == 1:
-                        await client.send_message(message.channel, str(ls))
-                        timeDiff(startTime)
-                        return
+                        await client.send_message(message.channel, 'content of ' + command + ': ' + str(ls))
                     # list files that match
                     else:
                         result = []
@@ -205,9 +202,7 @@ async def on_message(message):
                             timeDiff(startTime)
                             return
                         else:
-                            await client.send_message(message.channel, str(result))
-                            timeDiff(startTime)
-                            return
+                            await client.send_message(message.channel, 'match for ' + command + '/' + str(args[1:]) + ': ' + str(result))
                 
                 #send files that match
                 else:
@@ -219,7 +214,8 @@ async def on_message(message):
                     except DriveStorage.FileNotFoundError:
                         await client.send_message(message.channel, 'その' + command + 'は存在しません')
                         return
-                    await client.send_file(message.channel, pic[1], filename=pic[0], content=pic[0].split('.')[0])
+                    await client.send_file(message.channel, pic[1], filename=pic[0], content=message.author.name + ' sent: ' + 
+                    command + '/' + pic[0].split('.')[0])
                     pic[1].seek(0)
                     
             
@@ -233,10 +229,12 @@ async def on_message(message):
                 except DriveStorage.FileNotFoundError:
                     await client.send_message(message.channel, 'その' + command + 'は存在しません')
                     return
-                await client.send_file(message.channel, pic[1], filename=pic[0], content=pic[0].split('.')[0])
+                await client.send_file(message.channel, pic[1], filename=pic[0], content=message.author.name + ' sent: ' + 
+                command + '/' + pic[0].split('.')[0])
                 pic[1].seek(0)
             
 
+            await client.delete_message(message)
             return
 
         # gacha

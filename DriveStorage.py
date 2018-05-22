@@ -1,4 +1,3 @@
-import configparser
 import random
 from collections import OrderedDict
 from functools import lru_cache
@@ -129,7 +128,7 @@ class DriveStorage:
                 else:
                     raise DirectoryNotFoundError('The specified directory: "' +  dir + '" was not found')
 
-        # if cached, not need to connect to Google
+        # if cached, no need to connect to Google
         if filenames: 
             for key in list(curDir['subdir'].keys()):
                 matchObj = curDir['subdir'][key]
