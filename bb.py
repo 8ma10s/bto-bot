@@ -150,21 +150,33 @@ async def on_message(message):
             elif args[0].startswith('list'):
                 await client.send_message(message.channel, '\'list\'っていう名前は使えない仕様だよ')
                 return
+            # get specified message
+            if len(args) > 1:
+                try:
+                    imgMsg = await client.get_message(message.channel, args[1])
+                except discord.NotFound:
+                    await client.send_message(message.channel, 'そんなIDねーよ')
+                    return
+                except discord.HTTPException:
+                    await client.send_message(message.channel, 'そんなIDねーよ')
+                    return
+            
             # save the picture
             else:
                 await client.send_message(message.channel, 'よしいいぞ、' + 'フォルダ' + command + 'に' + args[0] + 'として登録したいファイルをよこせ')
                 imgMsg = await client.wait_for_message(timeout = 60, author=message.author, channel=message.channel)
-                if imgMsg.attachments:
-                    async with aiohttp.ClientSession() as session:
-                        async with session.get(imgMsg.attachments[0]['url']) as resp:
-                            attachment = await resp.read()
-                            pic = io.BytesIO(attachment)
-                            ds.upload(pic, [STAMPDIR, command], args[0])
-                            pic.seek(0)
-                            await client.send_file(message.channel, pic, filename=args[0], content='フォルダ' + command + 'に' + args[0] + 'を追加')
-                            pic.seek(0)
-                else:
-                    await client.send_message(message.channel, '添付ファイルが無いんだけど・・・')
+
+            if imgMsg.attachments:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(imgMsg.attachments[0]['url']) as resp:
+                        attachment = await resp.read()
+                        pic = io.BytesIO(attachment)
+                        ds.upload(pic, [STAMPDIR, command], args[0])
+                        pic.seek(0)
+                        await client.send_file(message.channel, pic, filename=args[0], content='フォルダ' + command + 'に' + args[0] + 'を追加')
+                        pic.seek(0)
+            else:
+                await client.send_message(message.channel, '添付ファイルが無いんだけど・・・')
             return 
 
         # sending stamp
