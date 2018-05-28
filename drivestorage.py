@@ -4,16 +4,8 @@ from functools import lru_cache
 
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
-
-
-class DirectoryNotFoundError(Exception):
-    """Exception thrown when a specified directory is not found"""
-
-class FileNotFoundError(Exception):
-    """Exception throw when a specified file is not found"""
-
-class IsNotDirectoryError(Exception):
-    """Exception thrown when a specified directory is a file"""
+import error
+import os
 
 class DriveStorage:
 
@@ -62,13 +54,13 @@ class DriveStorage:
         for dir in targetPath:
             if dir in curDir['subdir']:
                 if not curDir['subdir'][dir]['isDir']:
-                    raise NotADirectoryError('name: "' + dir + '" is not a directory')
+                    raise error.NotADirectoryError('name: "' + dir + '" is not a directory')
                 curDir = curDir['subdir'][dir]
             else:
                 self.__refreshDir(curDir['id'], curDir)
                 if dir in curDir['subdir']:
                     if not curDir['subdir'][dir]['isDir']:
-                        raise NotADirectoryError('name: "' + dir + '" is not a directory')
+                        raise error.NotADirectoryError('name: "' + dir + '" is not a directory')
                     curDir = curDir['subdir'][dir]
                 else:
                     # create new folder
@@ -106,7 +98,7 @@ class DriveStorage:
             self.dataCache[gFile['id']].close()
         self.dataCache[gFile['id']] = data
         self.cacheSize += data.getbuffer().nbytes
-        self.listFiles.cache_clear()
+        self.__listFiles.cache_clear()
         curDir['subdir'][filename] = {'id': gFile['id'], 'isDir':False, 'subdir':{}}
         return data
 
@@ -116,17 +108,17 @@ class DriveStorage:
         for dir in targetPath:
             if dir in curDir['subdir']:
                 if not curDir['subdir'][dir]['isDir']:
-                    raise NotADirectoryError('name: "' + dir + '" is not a directory')
+                    raise error.NotADirectoryError('name: "' + dir + '" is not a directory')
                 curDir = curDir['subdir'][dir]
             else:
 
                 self.__refreshDir(curDir['id'], curDir)
                 if dir in curDir['subdir']:
                     if not curDir['subdir'][dir]['isDir']:
-                        raise NotADirectoryError('name: "' + dir + '" is not a directory')
+                        raise error.NotADirectoryError('name: "' + dir + '" is not a directory')
                     curDir = curDir['subdir'][dir]
                 else:
-                    raise DirectoryNotFoundError('The specified directory: "' +  dir + '" was not found')
+                    raise error.DirectoryNotFoundError('The specified directory: "' +  dir + '" was not found')
 
         # if cached, no need to connect to Google
         if filenames: 
@@ -141,9 +133,16 @@ class DriveStorage:
         gFiles = list(filter(lambda x: all(y in x['title'] for y in filenames), gFiles))
 
         if not gFiles:
-            raise FileNotFoundError('Could not find a file that matches all queries')
-        # choose a random file among the ones that matched the query
-        gFile = random.choice(gFiles)
+            raise error.FileNotFoundError('Could not find a file that matches all queries')
+        # choose exact match if exists. If not, choose a random file among the ones that matched the query
+        gFile = None
+        if len(filenames) == 1:
+            for match in gFiles:
+                print(match['title'])
+                if os.path.splitext(match['title'])[0] == os.path.splitext(filenames[0])[0]:
+                    gFile = match
+        if not gFile:
+            gFile = random.choice(gFiles)
         
         # if cached, return cache
         if gFile['id'] in self.dataCache:
@@ -160,24 +159,27 @@ class DriveStorage:
             print('not cached')
             return (gFile['title'], gFile.content)
     
-    @lru_cache()
     def listFiles(self, location):
+        return self.__listFiles(tuple(location))
+
+    @lru_cache()
+    def __listFiles(self, location):
         targetPath = list(location)
         curDir = self.dirTree['root']
         for dir in targetPath:
             if dir in curDir['subdir']:
                 if not curDir['subdir'][dir]['isDir']:
-                    raise NotADirectoryError('name: "' + dir + '" is not a directory')
+                    raise error.NotADirectoryError('name: "' + dir + '" is not a directory')
                 curDir = curDir['subdir'][dir]
             else:
 
                 self.__refreshDir(curDir['id'], curDir)
                 if dir in curDir['subdir']:
                     if not curDir['subdir'][dir]['isDir']:
-                        raise NotADirectoryError('name: "' + dir + '" is not a directory')
+                        raise error.NotADirectoryError('name: "' + dir + '" is not a directory')
                     curDir = curDir['subdir'][dir]
                 else:
-                    raise DirectoryNotFoundError('The specified directory: "' +  dir + '" was not found')
+                    raise error.DirectoryNotFoundError('The specified directory: "' +  dir + '" was not found')
         
         print("'" + curDir['id'] + "' in parents and trashed=false")
         gFiles = self.drive.ListFile({'q': "'" + curDir['id'] + "' in parents and trashed=false"}).GetList()

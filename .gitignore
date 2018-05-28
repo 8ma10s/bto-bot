@@ -1,4 +1,7 @@
-keys.ini
+*.ini
+!*spec.ini
 *.json
 stamps/
 __pycache__/
+*.gdsheet
+*.gdform

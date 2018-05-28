@@ -1,21 +1,37 @@
 import asyncio
 import configparser
+import io
 import os
 import random
 import sys
-import time
-import io
 
 import aiohttp
 import discord
 import numpy as np
-import DriveStorage
+from configobj import ConfigObj
 
-# check if heroku
-onHeroku  = False
-if 'DYNO' in os.environ:
-    onHeroku = True
-#load config
+import datacontainer
+import error
+import utilities
+
+# load config / google drive
+dc = datacontainer.DataContainer()
+keys = dc.keys
+configs = dc.configs
+stats = dc.stats
+ds = dc.drive
+
+# set up discord client
+client = discord.Client()
+
+# load utilities function
+utils = utilities.Utilities(client,dc)
+
+# set global variables
+sleep = False
+rubyLock = True
+
+"""#load config
 CONFIGDIR = 'config'
 CONFIGFILE = 'config.ini'
 KEYSFILE = 'keys.ini'
@@ -49,10 +65,8 @@ DINING_HALL = config.get('lists', 'DINING_HALL').splitlines()
 GACHA_NAME = dict(config.items('GACHA_NAME'))
 GACHA_PROB = {k:float(v) for k, v in dict(config.items('GACHA_PROB')).items()}
 PLS_WORDS = config.get('lists', 'PLS_WORDS').splitlines()
+"""
 
-# global variables
-sleep = False
-rubyLock = True
 
 # How to use
 
@@ -61,29 +75,6 @@ DOCUMENT = {
 }
 
 
-# functions
-def isMsgToMe(msg):
-    return client.user.name in msg.content
-
-async def isAuthorized(msg, prompt):
-    passInt = random.randint(0,999)
-    print(passInt)
-    master = await client.get_user_info(MY_ID)
-    await client.send_message(master, str(passInt))
-    await client.send_message(msg.channel, prompt)
-    answer = await client.wait_for_message(timeout = 20, author=msg.author, channel=msg.channel)
-    return not (answer == None or str(passInt) != answer.content)
-
-def timeDiff(start):
-    end = time.time()
-    print(end - start)
-
-def getProb(card):
-    return GACHA_PROB[card.split('_')[1]]
-
-# initial setup
-client = discord.Client()
-ds = DriveStorage.DriveStorage(ROOTID, onHeroku)
 
 @client.event
 async def on_ready():
@@ -101,7 +92,6 @@ async def on_message(message):
     
     #detect a command
     if message.content.startswith(';'):
-        startTime = time.time()
         isStamp = False
         addStamp = False
         msg = message.content.split()
@@ -127,7 +117,7 @@ async def on_message(message):
         #during sleep, only accepts wakeup command
         if sleep:
             if command == 'wakeup' and not isStamp:
-                if await isAuthorized(message, '今日は何日？'):
+                if await utils.isAuthorized(message, '今日は何日？'):
                     sleep = False
                     await client.send_message(message.channel, 'ぽきた')
                     return
@@ -139,6 +129,7 @@ async def on_message(message):
 
         # adding stamp
         elif addStamp:
+            config = configs['stamps']
             # preprocessing
             if any(x in command for x in ['..', '/', '\\']):
                 await client.send_message(message.channel, '悪用禁止')
@@ -171,7 +162,7 @@ async def on_message(message):
                     async with session.get(imgMsg.attachments[0]['url']) as resp:
                         attachment = await resp.read()
                         pic = io.BytesIO(attachment)
-                        ds.upload(pic, [STAMPDIR, command], args[0])
+                        ds.upload(pic, config['DIR'] + [command], args[0])
                         pic.seek(0)
                         await client.send_file(message.channel, pic, filename=args[0], content='フォルダ' + command + 'に' + args[0] + 'を追加')
                         pic.seek(0)
@@ -181,6 +172,7 @@ async def on_message(message):
 
         # sending stamp
         elif isStamp:
+            config = configs['stamps']
             if not command:
                 await client.send_message(message.channel, DOCUMENT['stamp'])
                 return
@@ -189,15 +181,15 @@ async def on_message(message):
                 return
             # list all folders
             if command == 'list':
-                ls = sorted(ds.listFiles(tuple([STAMPDIR])))
+                ls = sorted(ds.listFiles(config['DIR']))
                 await client.send_message(message.channel, 'list of folders: ' + str(ls))
 
             elif args:
                 # list files in the specified folder
                 if args[0] == 'list':
                     try:
-                        ls = sorted(ds.listFiles(tuple([STAMPDIR, command])))
-                    except DriveStorage.DirectoryNotFoundError:
+                        ls = sorted(ds.listFiles(config['DIR'] + [command]))
+                    except error.DirectoryNotFoundError:
                         await client.send_message(message.channel, 'そんなフォルダは無いZOY')
                         return
                     # list all files
@@ -211,7 +203,6 @@ async def on_message(message):
                                 result = result + [data]
                         if not result:
                             await client.send_message(message.channel, 'そんな名前の' + command + 'は一人もいなかったよ')
-                            timeDiff(startTime)
                             return
                         else:
                             await client.send_message(message.channel, 'match for ' + command + '/' + str(args[1:]) + ': ' + str(result))
@@ -219,11 +210,11 @@ async def on_message(message):
                 #send files that match
                 else:
                     try:
-                        pic = ds.download([STAMPDIR, command], args)
-                    except DriveStorage.DirectoryNotFoundError:
+                        pic = ds.download(config['DIR'] + [command], args)
+                    except error.DirectoryNotFoundError:
                         await client.send_message(message.channel, 'そんなフォルダは無いZOY')
                         return
-                    except DriveStorage.FileNotFoundError:
+                    except error.FileNotFoundError:
                         await client.send_message(message.channel, 'その' + command + 'は存在しません')
                         return
                     await client.send_file(message.channel, pic[1], filename=pic[0], content=message.author.name + ' sent: ' + 
@@ -234,11 +225,11 @@ async def on_message(message):
             # choose a random file from the specified folder and send
             else:
                 try:
-                    pic = ds.download([STAMPDIR, command], [])
-                except DriveStorage.DirectoryNotFoundError:
+                    pic = ds.download(config['DIR'] + [command], [])
+                except error.DirectoryNotFoundError:
                     await client.send_message(message.channel, 'そんなフォルダは無いZOY')
                     return
-                except DriveStorage.FileNotFoundError:
+                except error.FileNotFoundError:
                     await client.send_message(message.channel, 'その' + command + 'は存在しません')
                     return
                 await client.send_file(message.channel, pic[1], filename=pic[0], content=message.author.name + ' sent: ' + 
@@ -248,56 +239,10 @@ async def on_message(message):
 
             await client.delete_message(message)
             return
-
-        # gacha
-        elif command == 'g':
-            if not args:
-                await client.send_message(message.channel, '数字入れろ数字')
-                return
-            
-            # Obtains server of message and finds rom-bot
-            currentServer = message.server
-            if currentServer == None:
-                await client.send_message(message.channel, 'DMでガチャはできないの分かってて送っただろ')
-                return
-            target = currentServer.get_member_named('rom男-bot#5739')
-            if target == None:
-                await client.send_message(message.channel, 'rom男botがいないサーバーでガチャはできない')
-                return
-            
-            # does gacha until ur
-            if args[0] == 'ur':
-                for i in range(100):
-                    await client.send_message(message.channel, '/g')
-                    received = await client.wait_for_message(timeout = 30, author=target, channel=message.channel, check=isMsgToMe)
-                    if received == None:
-                        await client.send_message(message.channel, 'ROM男bot死んだんじゃないの〜？')
-                        return
-                    elif 'UR' in received.content:
-                        await client.send_message(message.channel, 'UR余裕だな')
-                        return
-                    elif i >= MAX_UR:
-                        pic = open('muritura.jpg', 'rb')
-                        await client.send_file(message.channel, pic, content='二度とやらんわこんなクソゲー')
-                        pic.close()
-                        return
-            # does gacha n times
-            else:
-                try:
-                  int(args[0])
-                except ValueError:
-                  await client.send_message(message.channel, '数字以外を入れるな')
-                  return
-            
-                if int(args[0]) > MAX_GACHA:
-                   await client.send_message(message.channel, 'せいぜい' + str(MAX_GACHA) + '連までにしような')
-                   return
-                for i in range(int(args[0])):
-                    await client.send_message(message.channel, '/g')
         
         #if authorized, kill bto-bot
         elif command == 'kill':
-            if await isAuthorized(message, '俺を殺したいなら終了パスワードを入れろ'):
+            if await utils.isAuthorized(message, '俺を殺したいなら終了パスワードを入れろ'):
                 await client.send_message(message.channel, 'グエー死んだンゴ')
                 await client.logout()
                 return
@@ -307,7 +252,7 @@ async def on_message(message):
 
         # sleep (and not respond) until wakeup
         elif command == 'sleep':
-            if await isAuthorized(message, '今何時や・・・？'):
+            if await utils.isAuthorized(message, '今何時や・・・？'):
                 sleep = True
                 await client.send_message(message.channel, 'ぽやしみ〜〜')
                 return
@@ -317,19 +262,21 @@ async def on_message(message):
         
         #choose a dining hall to eat
         elif command == 'dining':
-            await client.send_message(message.channel, '今日は' + random.choice(DINING_HALL) + 'で食うかな')
+            config = configs['dining']
+            await client.send_message(message.channel, '今日は' + random.choice(config['LIST']) + 'で食うかな')
 
         # independent gacha feature
         elif command == 'gacha':
+            config = configs['gacha']
             repeat = 0
             getUr = False
             charRandom = True
             char = None
             arg = None
 
-            if args and args[0] in GACHA_NAME:
+            if args and args[0] in config['NAMES']:
                 if rubyLock and args[0] == 'ruby':
-                    pic = open(os.path.join(RESOURCESDIR, 'aoruby.jpg'), 'rb')
+                    pic = open(os.path.join(*configs['RESOURCESDIR'], 'aoruby.jpg'), 'rb')
                     await client.send_file(message.channel, pic, content='ルビキチに人権はありませーんｗｗｗｗｗｗ')
                     pic.close()
                     await client.send_message(message.channel, '人にものを頼む時はなんて言うんだっけ？')
@@ -337,9 +284,9 @@ async def on_message(message):
                     if not plsMsg:
                         await client.send_message(message.channel, 'ほう、だんまりか')
                         return
-                    if plsMsg.author.id not in ROM_ID:
+                    if plsMsg.author.id not in keys['ROM_IDS']:
                         await client.send_message(message.channel, plsMsg.author.name + 'さんでしたか、これは失礼しました。こちらがご指定のルビィちゃんになります。')
-                    elif all(x not in plsMsg.content for x in PLS_WORDS):
+                    elif all(x not in plsMsg.content for x in config['PLS_WORDS']):
                         await client.send_message(message.channel, 'そんな態度じゃルビィちゃんは出せないなぁ・・・')
                         return
                 char = args[0]
@@ -353,7 +300,7 @@ async def on_message(message):
                 repeat = 1
             elif arg.lower() == 'ur':
                 getUr = True
-                repeat = MAX_UR
+                repeat = config['MAX_UR']
             else:
                 try:
                     repeat = int(arg)
@@ -361,26 +308,26 @@ async def on_message(message):
                     await client.send_message(message.channel, '数字以外を入れるな')
                     return
             
-                if repeat > MAX_GACHA:
-                    await client.send_message(message.channel, 'せいぜい' + str(MAX_GACHA) + '連までにしような')
+                if repeat > config['MAX_GACHA']:
+                    await client.send_message(message.channel, 'せいぜい' + str(config['MAX_GACHA']) + '連までにしような')
                     return
 
-            chars = sorted(os.listdir(os.path.join(GACHADIR)))
-            ranks = list(GACHA_PROB.keys())
-            probs = list(GACHA_PROB.values())
+            chars = sorted(os.listdir(os.path.join(*config['DIR'])))
+            ranks = list(config['PROBS'].keys())
+            probs = list(config['PROBS'].values())
             for i in range(repeat):
                 if charRandom:
                     char = random.choice(chars)
                 rank = np.random.choice(ranks, p=probs)
-                cards = list(filter(lambda x: '_' + rank + '_' in x, os.listdir(os.path.join(GACHADIR, char))))
+                cards = list(filter(lambda x: '_' + rank + '_' in x, os.listdir(os.path.join(*config['DIR'], char))))
                 card = random.choice(cards)
 
-                pic = open(os.path.join(GACHADIR, char, card), 'rb')
+                pic = open(os.path.join(*config['DIR'], char, card), 'rb')
                 cardData = card.split('_')
 
 
 
-                await client.send_file(message.channel, pic, content=str(i + 1) + '連目\n' + cardData[1].upper() + ' ' + GACHA_NAME[char])
+                await client.send_file(message.channel, pic, content=str(i + 1) + '連目\n' + cardData[1].upper() + ' ' + config['NAMES'][char])
                 pic.close()
 
                 if getUr and cardData[1] == 'ur':
@@ -391,7 +338,7 @@ async def on_message(message):
                 await client.send_message(message.channel, '二度とやらんわこんなクソゲー')
 
         elif command == 'romLock':
-            if message.author.id not in ROM_ID:
+            if message.author.id not in keys['ROM_IDS']:
                 print(message.author.id)
                 if not args:
                     rubyLock = not rubyLock
@@ -417,4 +364,4 @@ async def on_message(message):
 
 
 
-client.run(DISCORD_SECRET)
+client.run(keys['DISCORD_SECRET'])
