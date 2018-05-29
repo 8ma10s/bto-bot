@@ -31,50 +31,7 @@ utils = utilities.Utilities(client,dc)
 sleep = False
 rubyLock = True
 
-"""#load config
-CONFIGDIR = 'config'
-CONFIGFILE = 'config.ini'
-KEYSFILE = 'keys.ini'
-config = configparser.ConfigParser()
-config.read(os.path.join(CONFIGDIR, CONFIGFILE))
-if not onHeroku:
-    configKeys = configparser.ConfigParser()
-    configKeys.read(os.path.join(CONFIGDIR, KEYSFILE))
-
-
-# keys/IDs setup
-if not onHeroku:
-    DISCORD_SECRET = configKeys.get('keys', 'discord_secret')
-    MY_ID = configKeys.get('ids', 'my_id')
-    ROM_ID = configKeys.get('ids', 'rom_ids').splitlines()
-    ROOTID = configKeys.get('dirids', 'ROOTID')
-else:
-    DISCORD_SECRET = os.environ.get('DISCORD_SECRET')
-    MY_ID = os.environ.get('MY_ID')
-    ROM_ID = os.environ.get('ROM_ID').split()
-    ROOTID = os.environ.get('ROOTID')
-
-# constant setup (from ini files)
-MAX_GACHA = config.getint('constants', 'MAX_GACHA')
-MAX_UR = config.getint('constants', 'MAX_UR')
-
-STAMPDIR = config.get('directories', 'STAMPDIR')
-GACHADIR = config.get('directories', 'GACHADIR')
-RESOURCESDIR = config.get('directories', 'RESOURCESDIR')
-DINING_HALL = config.get('lists', 'DINING_HALL').splitlines()
-GACHA_NAME = dict(config.items('GACHA_NAME'))
-GACHA_PROB = {k:float(v) for k, v in dict(config.items('GACHA_PROB')).items()}
-PLS_WORDS = config.get('lists', 'PLS_WORDS').splitlines()
-"""
-
-
 # How to use
-
-DOCUMENT = {
-    'stamp':'\";;F P\"でフォルダF内の画像Pを表示\n' + '\";;F\"でフォルダF内の画像をランダムに表示\n' '\";;F+ P\"でフォルダF内（Fがなければ作成）に画像Pを登録\n'
-}
-
-
 
 @client.event
 async def on_ready():
@@ -174,7 +131,6 @@ async def on_message(message):
         elif isStamp:
             config = configs['stamps']
             if not command:
-                await client.send_message(message.channel, DOCUMENT['stamp'])
                 return
             if any(x in command for x in ['..', '/', '\\']):
                 await client.send_message(message.channel, '悪用禁止')

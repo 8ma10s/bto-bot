@@ -10,7 +10,7 @@ import error
 
 
 class DataContainer:
-    """A wrapper for ConfigObj which keeps track of last modified time and uploads configs to Google Drive Accordingly"""
+    """A wrapper for ConfigObj which keeps track of all config files"""
 
     def __init__(self):
         """load config, their last modified times, initialize Google Drive Connection."""
@@ -83,7 +83,7 @@ class DataContainer:
             spec = join(*path, entry['spec']) if entry['spec'] else None
 
 
-            _ , data = self.drive.download(path, [filename])
+            _ , data = self.drive.download(path, [filename], exact=True)
             self.__dict__[entryname] = ConfigObj(data, indent_type='\t', configspec=spec)
 
             if self.__dict__[entryname].configspec != None and not self.__dict__[entryname].validate(Validator()):
