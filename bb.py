@@ -83,7 +83,7 @@ async def stamp(message, directory, filenames = []):
         return
 
     # send if there
-    await client.send_file(message.channel, pic, filename=picname, content=message.author.name + ' sent: ' + 
+    await client.send_file(message.channel, pic, filename=picname, content='**' + message.author.name + '** sent: ' + 
                     directory[0] + '/' + os.path.splitext(picname)[0])
 
 async def listStamps(message, directory=[], filenames =[]):
@@ -245,6 +245,10 @@ async def on_message(message):
         return
     else:
         command, args = result
+    
+    #sleeping, do nothing except wakeup
+    if isSleeping and command != 'wake':
+        return
     
     #if command, format argument
     argumentList = await utils.formatArgs(message, command, args)
