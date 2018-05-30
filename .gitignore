@@ -1,5 +1,6 @@
 *.ini
 !*spec.ini
+!files.ini
 *.json
 stamps/
 __pycache__/
