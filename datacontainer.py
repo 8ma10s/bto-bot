@@ -31,7 +31,7 @@ class DataContainer:
         is marked as modified. If specified, only the specified file is pushed."""
 
         if not filename:
-            for entry in self.__fileList:
+            for entry in self.__fileList.values():
                 self.__push(entry)
         elif filename in self.__fileList:
             self.__push(self.__fileList[filename])

@@ -100,7 +100,7 @@ class DriveStorage:
         curDir['entries'][filename] = {'id': gFile['id'], 'isDir':False, 'entries':{}}
         return data"""
 
-    def download(self, location, filenames, exact=False):
+    def download(self, location, filenames=[], exact=False):
         if exact and len(filenames) != 1:
             raise error.InvalidParametersError('if exact=True, there must only be 1 filename argument')
     
@@ -109,17 +109,17 @@ class DriveStorage:
         name = None
         id = None
         # if specified, get specified file
-        if filenames != []:
+        if not filenames:
+            files = [(entryname, entry['id']) for entryname, entry in curDir['entries'].items() if entry['entries'] == None]
+            name, id = random.choice(files)
+        # if file not specified, choose a random file
+        else:
             for entryname, entry in curDir['entries'].items():
                 if (exact and  entry['entries'] == None and os.path.splitext(entryname)[0] == os.path.splitext(filenames[0])[0]) \
                 or (not exact and entry['entries'] == None and all(filename in entryname for filename in filenames)):
                     name = entryname
                     id = entry['id']
                     break
-        # if file not specified, choose a random file
-        else:
-            files = [(entryname, entry['id']) for entryname, entry in curDir['entries'].items() if entry['entries'] == None]
-            name, id = random.choice(files)
 
         # if no file is found, throw an error
         if name == None or id == None:
@@ -196,9 +196,9 @@ class DriveStorage:
             return (gFile['title'], gFile.content) """
     
 
-    def listFiles(self, location):
+    def listFiles(self, location, filenames=[]):
         curDir = self.__getDirectory(location, self.dirIndex['root'])
-        return [name for name in curDir['entries']]
+        return [name for name in curDir['entries'] if all(filename in name for filename in filenames)]
 
     """
     @lru_cache()
