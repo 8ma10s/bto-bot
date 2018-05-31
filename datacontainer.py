@@ -58,7 +58,7 @@ class DataContainer:
     def __setKeys(self):
         """ retrieve the keys/secrets and set them to self.keys. """
         join = os.path.join
-        keynames = ConfigObj(infile=join('config', 'keysspec.ini'))
+        keynames = ConfigObj(infile=join('config', 'keysspec.ini'), encoding='utf_8')
         if self.onHeroku:
             keys = {}
             for keyname in keynames:
@@ -80,7 +80,7 @@ class DataContainer:
         """Load files.ini to get a list of necessary config files to load. Then, set each config file 
         as a member variable of this class, with names of those files being the member variable name"""
         join = os.path.join
-        self.entries = ConfigObj(infile=join('config', 'files.ini'), configspec=join('config', 'filesspec.ini'))
+        self.entries = ConfigObj(infile=join('config', 'files.ini'), encoding='utf_8', configspec=join('config', 'filesspec.ini'))
         self.entries.validate(Validator())
         # set names written on files.ini as member variables of this class
         for entryname, entry in self.entries.items():
@@ -91,7 +91,7 @@ class DataContainer:
 
 
             _ , data = self.drive.download(path, [filename], exact=True)
-            self.__dict__[entryname] = ConfigObj(data, indent_type='\t', configspec=spec)
+            setattr(self,entryname,ConfigObj(data, indent_type='\t', encoding='utf_8', configspec=spec))
 
             if self.__dict__[entryname].configspec != None and not self.__dict__[entryname].validate(Validator()):
                 print('File format validation for "' + filename + '" failed. Exiting')

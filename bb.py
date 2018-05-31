@@ -7,7 +7,6 @@ import signal
 import aiohttp
 import discord
 import numpy as np
-from configobj import ConfigObj
 
 import datacontainer
 import error

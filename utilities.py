@@ -73,18 +73,18 @@ class Utilities:
                 await self.client.send_message(message.channel, '引数の数が多すぎる')
                 return None
             elif len(args) == 2:
-                result = self.validateGacha(args[0], args[1])
+                result = self.__validateGacha(args[0], args[1])
                 if result['errorMsg'] != None:
                     await self.client.send_message(message.channel, result['errorMsg'])
                     return None
                 else:
                     return [result['ren'], result['char'], result['getUr'], result['isGacha']]
             elif len(args) == 1:
-                result = self.validateGacha(args[0], None)
+                result = self.__validateGacha(args[0], None)
                 if result['errorMsg'] == None:
                     return [result['ren'], result['char'], result['getUr'], result['isGacha']]
                 else:
-                    result = self.validateGacha(None, args[0])
+                    result = self.__validateGacha(None, args[0])
                     if result['errorMsg'] == None:
                         return [result['ren'], result['char'], result['getUr'], result['isGacha']]
                     else:
@@ -118,7 +118,7 @@ class Utilities:
 
 
 
-    def validateGacha(self, ren, char):
+    def __validateGacha(self, ren, char):
         config = self.configs['gacha']
         result = {'getUr':False, 'isGacha':True, 'errorMsg':None}
 
