@@ -1,5 +1,6 @@
 import asyncio
 import random
+import os
 
 
 class Utilities:
@@ -58,6 +59,8 @@ class Utilities:
                 if command == 'addStamp':
                     if len(args) < 2 or len(args) > 3:
                         await self.client.send_message(message.channel, '引数の数が多すぎるか少なすぎる')
+                    elif os.path.splitext(args[1])[1] == []:
+                        await self.client.send_message(message.channel, 'ファイル名に拡張子が無い')
                         return None
                     else:
                         return [directory, args[1], (args[2] if len(args) == 3 else None)]
@@ -171,7 +174,7 @@ class Utilities:
         if not reply:
             await self.client.send_message(message.channel, 'ほう、だんまりか')
             return False
-        if reply.author.id not in self.configs.keys['ROM_IDS']:
+        if reply.author.id not in self.dc.keys['ROM_IDS']:
             await self.client.send_message(message.channel, reply.author.name + 'さんでしたか、これは失礼しました。こちらがご指定のルビィちゃんになります。')
             return True
         elif all(x not in reply.content for x in config['PLS_WORDS']):
