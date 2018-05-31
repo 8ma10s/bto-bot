@@ -55,11 +55,11 @@ class Utilities:
                 return None
             else:
                 # do final check and format command
-                directory = [args[0].rstrip('+')] if len(args) > 0 else []
+                directory = [args[0].rstrip('+').lower()] if len(args) > 0 else []
                 if command == 'addStamp':
                     if len(args) < 2 or len(args) > 3:
                         await self.client.send_message(message.channel, '引数の数が多すぎるか少なすぎる')
-                    elif os.path.splitext(args[1])[1] == []:
+                    elif not os.path.splitext(args[1])[1]:
                         await self.client.send_message(message.channel, 'ファイル名に拡張子が無い')
                         return None
                     else:
@@ -134,9 +134,9 @@ class Utilities:
             result['char'] = None
         elif char.lower() in self.configs['gacha']['NAMES']:
             result['char'] = char.lower()
-        elif char in self.ds.listFiles(self.configs['stamp']['DIR']):
+        elif char.lower() in self.ds.listFiles(self.configs['stamp']['DIR']):
             result['isGacha'] = False
-            result['char'] = char
+            result['char'] = char.lower()
             if result['getUr']:
                 result['errorMsg'] = 'URオプションとスタンプガチャ機能は同時使用できません'
         elif not result['errorMsg']:

@@ -248,6 +248,7 @@ async def on_message(message):
     
     #sleeping, do nothing except wakeup
     if isSleeping and command != 'wake':
+        print('Command: ' + command + ' ignored due to sleep')
         return
     
     #if command, format argument
