@@ -1,10 +1,12 @@
+import os
 import random
 from collections import OrderedDict
 
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
+
 import error
-import os
+
 
 class DriveStorage:
 
@@ -12,7 +14,9 @@ class DriveStorage:
 
         # variables
         self.drive = self.__setupDrive(onHeroku)
+        print('Loading and indexing entries...')
         self.dirIndex = {'root':{'id':root, 'entries':self.__makeEntries(root) }}
+        print('Done!')
         self.dataCache = OrderedDict()
         self.cacheSize = 0
 
@@ -95,10 +99,11 @@ class DriveStorage:
     def __reduceCache(self):
         if self.cacheSize > 262144000:
             print('Reducing cache for DriveStorage')
-            for _ in range(50):
+            while self.cacheSize > 131072000:
                 bio = self.dataCache.pop(last = False)
                 self.cacheSize -= bio.getbuffer.nbytes
                 bio.close()
+            print('Size of cache reduced to ' + self.cacheSize)
         else:
             return
 
@@ -143,7 +148,6 @@ class DriveStorage:
         """A recursive function that retrieves the structure of every files/directories under a directory with id, and returns a dict
         representing that structure."""
         results = self.drive.ListFile({'q': "'" + id + "' in parents and trashed=false"}).GetList()
-        print([result['title'] for result in results])
         return { result['title']:{'id':result['id'], 
         'entries': self.__makeEntries(result['id']) if result['mimeType'] == 'application/vnd.google-apps.folder' else None} 
         for result in results if not result['title'].startswith('.')}
@@ -180,4 +184,3 @@ class DriveStorage:
             gauth.SaveCredentialsFile('mycreds.json') # replace with saveToEnv if heroku
 
         return GoogleDrive(gauth)
-    

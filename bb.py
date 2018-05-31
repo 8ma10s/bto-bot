@@ -1,9 +1,8 @@
 import asyncio
-import configparser
 import io
 import os
 import random
-import sys
+import signal
 
 import aiohttp
 import discord
@@ -26,6 +25,7 @@ client = discord.Client()
 
 # load utilities function
 utils = utilities.Utilities(client,dc)
+signal.signal(signal.SIGTERM, utils.sigterm_handler)
 
 # set global variables
 isSleeping = False
@@ -129,6 +129,13 @@ async def gacha(message, ren = None, char = None, getUr = False, isGacha = True)
         ranks = list(config['PROBS'].keys())
         probs = list(config['PROBS'].values())
 
+        # set up stats
+        if message.author.id not in dc.stats:
+            dc.stats[message.author.id] = {
+                'name': message.author.name,
+                'ur':0,'ssr':0,'sr':0,'r':0}
+
+
     for i in range(1 if not ren else ren):
         if isGacha:
             # choose character, rank, then a card that matches both conditions
@@ -137,12 +144,17 @@ async def gacha(message, ren = None, char = None, getUr = False, isGacha = True)
             cards = list(filter(lambda x: '_' + chosenRank + '_' in x, os.listdir(os.path.join(*config['DIR'], chosenChar))))
             chosenCard = random.choice(cards)
 
+            #modify stats
+            dc.stats[message.author.id][chosenRank] += 1
+
             # send the chosen card
             with open(os.path.join(*config['DIR'], chosenChar, chosenCard), 'rb') as pic:
                 await client.send_file(message.channel, pic, content=str(i + 1) + '連目\n' + chosenRank.upper() + ' ' + config['NAMES'][chosenChar])
             
+            #if ur mode and ur chosen, done
             if getUr and chosenRank == 'ur':
                 await client.send_message(message.channel, 'UR余裕だな')
+                dc.save('stats')
                 return
         else:
             picname, pic = ds.download(configs['stamp']['DIR'] + [char],\
@@ -153,6 +165,11 @@ async def gacha(message, ren = None, char = None, getUr = False, isGacha = True)
     if getUr:
         with open(os.path.join(*config['RESOURCESDIR'], 'muritura.jpg'), 'rb') as pic:
             await client.send_file(message.channel, pic, content='二度とやらんわこんなクソゲー')
+    
+    #if real gacha, make sure to save the results
+    if isGacha:
+        dc.save('stats')
+
     
 async def kill(message):
     print('Command: kill')
@@ -212,6 +229,36 @@ async def romLock(message, command=None):
         await client.send_message(message.channel, 'このコマンドは人間専用です')
         return
 
+async def stat(message, name = None):
+    if not name:
+        chosenName = message.author.name
+        id = message.author.id
+    else:
+        potentialMember = message.server.get_member_named(name)
+        if not potentialMember:
+            await client.send_message(message.channel, 'その名前のユーザーは存在しないよ')
+            return
+        else:
+            chosenName = potentialMember.name
+            id = potentialMember.id
+    
+    # get stats of id if id there
+    if id not in dc.stats:
+        await client.send_message(message.channel, 'その名前のユーザーはこれまでガチャを引いたことがないよ')
+        return
+    else:
+        userInfo = dc.stats[id]
+        ur, ssr, sr, r = userInfo['ur'], userInfo['ssr'], userInfo['sr'], userInfo['r']
+        total = ur + ssr + sr + r
+        await client.send_message(message.channel, 
+        '**' + chosenName + '** のガチャ記録:\n' + 
+        'UR: ' + str(ur) + '回 (' + '%.2f'%(100*ur/total) + '%)\n' +
+        'SSR: ' + str(ssr) + '回 (' + '%.2f'%(100*ssr/total) + '%)\n' +
+        'SR: ' + str(sr) + '回 (' + '%.2f'%(100*sr/total) + '%)\n' +
+        'R: ' + str(r) + '回 (' + '%.2f'%(100*r/total) + '%)\n' +
+        '**Total**: ' + str(total) + '回')
+
+
 # dictionaries of all functions
 commands = {
     'addStamp': addStamp,
@@ -222,7 +269,8 @@ commands = {
     'sleep' : sleep,
     'wake' : wake,
     'dining' : dining,
-    'romLock' : romLock
+    'romLock' : romLock,
+    'stat': stat
 }
 @client.event
 async def on_ready():
@@ -262,4 +310,4 @@ async def on_message(message):
         await commands[command](message, *argumentList)
 
 # run this
-client.run(keys['DISCORD_SECRET'])
+utils.run(keys['DISCORD_SECRET'])

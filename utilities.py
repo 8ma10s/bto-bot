@@ -1,6 +1,7 @@
 import asyncio
-import random
 import os
+import random
+import sys
 
 
 class Utilities:
@@ -104,6 +105,12 @@ class Utilities:
                 return None
             else:
                 return args
+        elif command == 'stat':
+            if len(args) > 1:
+                await self.client.send_message(message.channel, '引数の数が多すぎ')
+                return
+            else:
+                return args
         else:
             print('Somehow reached an invalid command state. The arguments were: \n' + \
             command + ' ' + str(args))
@@ -181,5 +188,42 @@ class Utilities:
             await self.client.send_message(message.channel, 'そんな態度じゃルビィちゃんは出せないなぁ・・・')
             return False
         else:
-            await self.client.send_message(message. channel, 'そんなに欲しいならくれてやろう')
+            await self.client.send_message(message.channel, 'そんなに欲しいならくれてやろう')
             return True
+
+    async def _periodicSave(self):
+        while True:
+            await asyncio.sleep(60*10)
+            updated = self.dc.push()
+            if updated:
+                print('Periodic Save: Updated config file')
+            else:
+                print('Periodic Save: no files to update')
+
+    def run(self, *args, **kwargs):
+        tasks = [asyncio.ensure_future(self.client.start(*args, **kwargs)),
+        asyncio.ensure_future(self._periodicSave())]
+        try:
+            self.client.loop.run_until_complete(asyncio.wait(tasks))
+        except KeyboardInterrupt:
+            self.dc.push()
+            self.client.loop.run_until_complete(self.client.logout())
+            pending = asyncio.Task.all_tasks(loop=self.client.loop)
+            gathered = asyncio.gather(*pending, loop=self.client.loop)
+            try:
+                gathered.cancel()
+                self.client.loop.run_until_complete(gathered)
+
+                # we want to retrieve any exceptions to make sure that
+                # they don't nag us about it being un-retrieved.
+                gathered.exception()
+            except:
+                pass
+        finally:
+            self.client.loop.close()
+
+    def sigterm_handler(self, signal, frame):
+        print('The process was killed due to sigterm')
+        self.dc.push()
+        print('Config files are successfully saved. Exiting')
+        sys.exit(0)

@@ -30,21 +30,28 @@ class DataContainer:
         """Pushes modified config files onto Google Drive. If filename is not specified, pushes everything that
         is marked as modified. If specified, only the specified file is pushed."""
 
+        result = False
         if not filename:
             for entry in self.__fileList.values():
-                self.__push(entry)
+                if self.__push(entry):
+                    result = True
         elif filename in self.__fileList:
-            self.__push(self.__fileList[filename])
+            result = self.__push(self.__fileList[filename])
         else:
             raise error.FileNotFoundError('A config file named "' + filename + '" does not exist.')
+
+        return result
 
     def __push(self, entry):
         """Internal function that takes entry in __fileList and uploads them if needed."""
         if entry['obj'] != None:
             data = io.BytesIO()
             entry['obj'].write(data)
-            self.drive.upload(data, entry['path'], entry[''])
+            self.drive.upload(data, entry['path'], entry['filename'])
             entry['obj'] = None
+            return True
+        else:
+            return False
         
 
 
