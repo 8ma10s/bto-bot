@@ -6,3 +6,4 @@ stamps/
 __pycache__/
 *.gdsheet
 *.gdform
+env/
