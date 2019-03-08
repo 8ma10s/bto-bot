@@ -25,6 +25,7 @@ client = discord.Client()
 # load utilities function
 utils = utilities.Utilities(client,dc)
 signal.signal(signal.SIGTERM, utils.sigterm_handler)
+signal.signal(signal.SIGINT, utils.sigterm_handler)
 
 # set global variables
 isSleeping = False

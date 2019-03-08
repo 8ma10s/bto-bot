@@ -2,7 +2,7 @@ import asyncio
 import os
 import random
 import sys
-
+import time
 
 class Utilities:
     """A class that contains all utility functions that are used in the main portion of the program"""
@@ -201,26 +201,27 @@ class Utilities:
                 print('Periodic Save: no files to update')
 
     def run(self, *args, **kwargs):
-        tasks = [asyncio.ensure_future(self.client.start(*args, **kwargs)),
-        asyncio.ensure_future(self._periodicSave())]
-        try:
-            self.client.loop.run_until_complete(asyncio.wait(tasks))
-        except KeyboardInterrupt:
-            self.dc.push()
-            self.client.loop.run_until_complete(self.client.logout())
-            pending = asyncio.Task.all_tasks(loop=self.client.loop)
-            gathered = asyncio.gather(*pending, loop=self.client.loop)
+        while True:
+            if self.client.is_closed:
+                self.client._closed.clear()
+                self.client.http.recreate()
             try:
-                gathered.cancel()
-                self.client.loop.run_until_complete(gathered)
-
-                # we want to retrieve any exceptions to make sure that
-                # they don't nag us about it being un-retrieved.
-                gathered.exception()
-            except:
-                pass
-        finally:
-            self.client.loop.close()
+                tasks = [asyncio.ensure_future(self.client.start(*args, **kwargs)),
+                asyncio.ensure_future(self._periodicSave())]
+                print("Tasks being run")
+                self.client.loop.run_until_complete(asyncio.wait(tasks))
+            except SystemExit:
+                sys.exit(0)
+            except BaseException as e:
+                print("Exception:" + str(e))
+                self.dc.push()
+                self.client.loop.run_until_complete(self.client.logout())
+                pending = asyncio.Task.all_tasks(loop=self.client.loop)
+                for task in pending:
+                    task.cancel()
+                print("All tasks canceled. Waiting 5 seconds and restarting...")
+                time.sleep(5)
+                
 
     def sigterm_handler(self, signal, frame):
         print('The process was killed due to sigterm')
