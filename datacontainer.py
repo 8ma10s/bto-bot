@@ -40,6 +40,8 @@ class DataContainer:
         else:
             raise error.FileNotFoundError('A config file named "' + filename + '" does not exist.')
 
+        # upload the index
+        self.drive.uploadIndex()
         return result
 
     def __push(self, entry):

@@ -1,6 +1,8 @@
 import os
 import random
 from collections import OrderedDict
+import json
+from io import BytesIO
 
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
@@ -14,11 +16,24 @@ class DriveStorage:
 
         # variables
         self.drive = self.__setupDrive(onHeroku)
-        print('Loading and indexing entries...')
-        self.dirIndex = {'root':{'id':root, 'entries':self.__makeEntries(root) }}
-        print('Done!')
+        results = self.drive.ListFile({'q': "'" + root + "' in parents and trashed=false"}).GetList()
+        self.dirIndex = {}
+        self.indexName = 'index.json'
         self.dataCache = OrderedDict()
         self.cacheSize = 0
+        for result in results:
+            if result['title'] == self.indexName:
+                gFile = self.drive.CreateFile({'id': result['id'] })
+                gFile.FetchContent()
+                self.dirIndex = json.loads(gFile.content.getvalue().decode('UTF-8', 'strict'))
+                break
+        
+        if not self.dirIndex:
+            print('Loading and indexing entries...')
+            self.dirIndex = {'root':{'id':root, 'entries':self.__makeEntries(root) }}
+            print('Done!')
+            self.uploadIndex()
+
 
 
     # upload the file to the specific location
@@ -90,6 +105,10 @@ class DriveStorage:
         self.dataCache[id].seek(0)
         return (name, self.dataCache[id])
 
+    def uploadIndex(self):
+        indexStr = json.dumps(self.dirIndex)
+        data = BytesIO(indexStr.encode('UTF-8', errors='strict'))
+        self.upload(data, [], self.indexName)
 
     def listFiles(self, location, filenames=[]):
         curDir = self.__getDirectory(location, self.dirIndex['root'])
